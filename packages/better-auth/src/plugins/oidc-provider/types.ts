@@ -1,4 +1,21 @@
-import type { User } from "../../types";
+import type { GenericEndpointContext, User } from "../../types";
+
+export type GetAdditionalUserInfoClaim = (
+	user: User & Record<string, any>,
+	scopes: string[],
+) => Record<string, any> | Promise<Record<string, any>>;
+
+export const isGetAdditionalUserInfoClaim = (
+	fn: Function,
+): fn is GetAdditionalUserInfoClaim => {
+	return fn.length === 2;
+};
+
+export type GetAdditionalUserInfoClaimWithCtx = (
+	ctx: GenericEndpointContext,
+	user: User & Record<string, any>,
+	scopes: string[],
+) => Record<string, any> | Promise<Record<string, any>>;
 
 export interface OIDCOptions {
 	/**
@@ -117,10 +134,9 @@ export interface OIDCOptions {
 	 * @param scopes - The scopes that the client requested.
 	 * @returns The user info claim.
 	 */
-	getAdditionalUserInfoClaim?: (
-		user: User & Record<string, any>,
-		scopes: string[],
-	) => Record<string, any> | Promise<Record<string, any>>;
+	getAdditionalUserInfoClaim?:
+		| GetAdditionalUserInfoClaim
+		| GetAdditionalUserInfoClaimWithCtx;
 }
 
 export interface AuthorizationQuery {

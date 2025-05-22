@@ -7,16 +7,21 @@ import {
 	getSessionFromCtx,
 	sessionMiddleware,
 } from "../../api";
-import type { BetterAuthPlugin, GenericEndpointContext } from "../../types";
+import type {
+	BetterAuthPlugin,
+	GenericEndpointContext,
+	User,
+} from "../../types";
 import { generateRandomString } from "../../crypto";
 import { subtle } from "@better-auth/utils";
 import { schema } from "./schema";
-import type {
-	Client,
-	CodeVerificationValue,
-	OAuthAccessToken,
-	OIDCMetadata,
-	OIDCOptions,
+import {
+	type Client,
+	type CodeVerificationValue,
+	type OAuthAccessToken,
+	type OIDCMetadata,
+	type OIDCOptions,
+	isGetAdditionalUserInfoClaim,
 } from "./types";
 import { authorize } from "./authorize";
 import { parseSetCookieHeader } from "../../cookies";
@@ -29,6 +34,23 @@ const getJwtPlugin = (ctx: GenericEndpointContext) => {
 	return ctx.context.options.plugins?.find(
 		(plugin) => plugin.id === "jwt",
 	) as Omit<BetterAuthPlugin, "options"> & { options?: JwtOptions };
+};
+
+const getAdditionalUserInfoClaim = (
+	ctx: GenericEndpointContext,
+	user: User,
+	scopes: string[],
+	options?: OIDCOptions,
+) => {
+	if (!options?.getAdditionalUserInfoClaim) {
+		return {};
+	}
+
+	if (isGetAdditionalUserInfoClaim(options.getAdditionalUserInfoClaim)) {
+		return options.getAdditionalUserInfoClaim(user, scopes);
+	}
+
+	return options.getAdditionalUserInfoClaim(ctx, user, scopes);
 };
 
 const getMetadata = (
@@ -624,9 +646,12 @@ export const oidcProvider = (options: OIDCOptions) => {
 						...(requestedScopes.includes("email") ? email : {}),
 					};
 
-					const additionalUserClaims = options.getAdditionalUserInfoClaim
-						? options.getAdditionalUserInfoClaim(user, requestedScopes)
-						: {};
+					const additionalUserClaims = getAdditionalUserInfoClaim(
+						ctx,
+						user,
+						requestedScopes,
+						options,
+					);
 
 					const payload = {
 						sub: user.id,
@@ -834,8 +859,9 @@ export const oidcProvider = (options: OIDCOptions) => {
 							: undefined,
 					};
 					const userClaims = options.getAdditionalUserInfoClaim
-						? options.getAdditionalUserInfoClaim(user, requestedScopes)
+						? getAdditionalUserInfoClaim(ctx, user, requestedScopes, options)
 						: baseUserClaims;
+
 					return ctx.json({
 						...baseUserClaims,
 						...userClaims,
